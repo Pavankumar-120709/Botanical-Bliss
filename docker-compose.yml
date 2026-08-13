@@ -1,0 +1,104 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: botanical-bliss-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-botanical-bliss_store}
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-password}
+    # removed ports to avoid host conflicts since Neon is used or a local pg is running
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - botanical-bliss-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      timeout: 10s
+      retries: 5
+      interval: 30s
+      start_period: 30s
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./pandac-store-backend
+      dockerfile: Dockerfile
+    container_name: botanical-bliss-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:-botanical-bliss_store}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      - DATABASE_URL=${DATABASE_URL:-jdbc:postgresql://postgres:5432/botanical-bliss_store}
+      - JPA_SHOW_URL=${JPA_SHOW_URL:-false}
+      - HIBERNATE_FORMAT_SQL=${HIBERNATE_FORMAT_SQL:-false}
+      - CLERK_ISSUER_URI=${CLERK_ISSUER_URI}
+      - GIT_TOKEN=${GIT_TOKEN:-}
+      - GIT_USERNAME=${GIT_USERNAME:-}
+      - GIT_REPO_URL=${GIT_REPO_URL:-}
+      - CDN_BASE_URL=${CDN_BASE_URL:-}
+      - FILE_MAX_SIZE=${FILE_MAX_SIZE:-10MB}
+      - FILE_MAX_REQUEST_SIZE=${FILE_MAX_REQUEST_SIZE:-10MB}
+    # Remove external port exposure - only accessible via nginx
+    networks:
+      - botanical-bliss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      timeout: 10s
+      retries: 5
+      interval: 30s
+      start_period: 60s
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./botanical-bliss-store-ui
+      dockerfile: Dockerfile
+    container_name: botanical-bliss-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Remove external port exposure - only accessible via nginx
+    networks:
+      - botanical-bliss-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: botanical-bliss-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "8088:80"  # Changed to 8088 to avoid collisions with port 80 and 3000
+    networks:
+      - botanical-bliss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      timeout: 10s
+      retries: 3
+      interval: 30s
+      start_period: 30s
+
+networks:
+  botanical-bliss-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

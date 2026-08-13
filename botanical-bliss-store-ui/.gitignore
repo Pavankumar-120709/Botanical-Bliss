@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Ignore environment files containing sensitive data
+.env
+
+# Ignore environment files with secrets (but keep .env.example)
+.env.local
+.env.development
+.env.test
+.env.production
+
+# ...existing code...
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+cookies.txt
+test-*.js
+
+# Documentation files
+*_FIX.md
+*_GUIDE.md
+*_IMPROVEMENTS.md
